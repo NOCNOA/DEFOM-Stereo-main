@@ -1,0 +1,27 @@
+# training logs
+*.log
+logs/
+log/
+runs/
+wandb/
+
+# model checkpoints / weights
+*.pth
+*.pt
+*.ckpt
+*.bin
+*.safetensors
+
+# training outputs
+checkpoints/
+checkpoint/
+weights/
+pretrained/
+outputs/
+output/
+work_dirs/
+
+# cache
+__pycache__/
+*.pyc
+.cache/

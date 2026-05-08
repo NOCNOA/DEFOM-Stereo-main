@@ -1,0 +1,4 @@
+1、upsample是使用foundation的上采用
+2、highdim是volume 通道为28
+3、hw_galerkin是整个图像上的galerkin
+4、corr是加上corr的版本

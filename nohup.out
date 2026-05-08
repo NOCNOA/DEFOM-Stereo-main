@@ -1,0 +1,174 @@
+2026-03-26 20:44:25,196 INFO     [stereo_datasets.py:760] Added 22390 from FlyingThings frames_cleanpass
+2026-03-26 20:44:25,196 INFO     [stereo_datasets.py:760] Added 22390 from FlyingThings frames_cleanpass
+2026-03-26 20:44:25,468 INFO     [stereo_datasets.py:774] Added 8664 from Monkaa frames_cleanpass
+2026-03-26 20:44:25,469 INFO     [stereo_datasets.py:774] Added 8664 from Monkaa frames_cleanpass
+2026-03-26 20:44:25,584 INFO     [stereo_datasets.py:788] Added 4400 from Driving frames_cleanpass
+2026-03-26 20:44:25,586 INFO     [stereo_datasets.py:788] Added 4400 from Driving frames_cleanpass
+2026-03-26 20:44:38,087 INFO     [stereo_datasets.py:760] Added 22390 from FlyingThings frames_finalpass
+2026-03-26 20:44:38,091 INFO     [stereo_datasets.py:760] Added 22390 from FlyingThings frames_finalpass
+2026-03-26 20:44:38,358 INFO     [stereo_datasets.py:774] Added 8664 from Monkaa frames_finalpass
+2026-03-26 20:44:38,359 INFO     [stereo_datasets.py:774] Added 8664 from Monkaa frames_finalpass
+2026-03-26 20:44:38,424 INFO     [stereo_datasets.py:788] Added 4400 from Driving frames_finalpass
+2026-03-26 20:44:38,424 INFO     [stereo_datasets.py:788] Added 4400 from Driving frames_finalpass
+2026-03-26 20:44:38,424 INFO     [stereo_datasets.py:1141] Adding 70908 samples from SceneFlow
+2026-03-26 20:44:38,424 INFO     [stereo_datasets.py:1175] Training with 70908 image pairs
+2026-03-26 20:44:38,424 INFO     [stereo_datasets.py:1141] Adding 70908 samples from SceneFlow
+2026-03-26 20:44:38,424 INFO     [stereo_datasets.py:1175] Training with 70908 image pairs
+  0%|          | 0/17727 [00:00<?, ?it/s]  0%|          | 0/17727 [00:00<?, ?it/s]/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/timm/models/layers/__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
+/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/timm/models/layers/__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
+/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/timm/models/layers/__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
+/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/timm/models/layers/__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
+cudnn.enabled = True
+cudnn.deterministic = False
+cudnn.benchmark = True
+cudnn.enabled = True
+cudnn.deterministic = False
+cudnn.benchmark = True
+cudnn.enabled = True
+cudnn.deterministic = False
+cudnn.benchmark = True
+cudnn.enabled = True
+cudnn.deterministic = False
+cudnn.benchmark = True
+  0%|          | 0/17727 [00:11<?, ?it/s]
+Traceback (most recent call last):
+  File "/home/yijiayi/DEFOM-Stereo-main2/DEFOM-Stereo-main/train_stereo.py", line 293, in <module>
+    train(args)
+  File "/home/yijiayi/DEFOM-Stereo-main2/DEFOM-Stereo-main/train_stereo.py", line 150, in train
+    disp_predictions = model(image1, image2, iters=args.train_iters, scale_iters=args.scale_iters)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+  0%|          | 0/17727 [00:11<?, ?it/s]
+    return forward_call(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/parallel/distributed.py", line 1519, in forward
+Traceback (most recent call last):
+  File "/home/yijiayi/DEFOM-Stereo-main2/DEFOM-Stereo-main/train_stereo.py", line 293, in <module>
+    else self._run_ddp_forward(*inputs, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/parallel/distributed.py", line 1355, in _run_ddp_forward
+    train(args)
+  File "/home/yijiayi/DEFOM-Stereo-main2/DEFOM-Stereo-main/train_stereo.py", line 150, in train
+    return self.module(*inputs, **kwargs)  # type: ignore[index]
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    disp_predictions = model(image1, image2, iters=args.train_iters, scale_iters=args.scale_iters)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/yijiayi/DEFOM-Stereo-main2/DEFOM-Stereo-main/core/defom_hw_galerkin.py", line 197, in forward
+    cnet_list = self.cnet(image1, d_features)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/parallel/distributed.py", line 1519, in forward
+    return self._call_impl(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/yijiayi/DEFOM-Stereo-main2/DEFOM-Stereo-main/core/extractor.py", line 362, in forward
+    else self._run_ddp_forward(*inputs, **kwargs)
+    x = self.layer1(x)  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/parallel/distributed.py", line 1355, in _run_ddp_forward
+
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return self.module(*inputs, **kwargs)  # type: ignore[index]
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/container.py", line 215, in forward
+    input = module(input)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+      File "/home/yijiayi/DEFOM-Stereo-main2/DEFOM-Stereo-main/core/extractor.py", line 133, in forward
+return forward_call(*args, **kwargs)
+  File "/home/yijiayi/DEFOM-Stereo-main2/DEFOM-Stereo-main/core/defom_hw_galerkin.py", line 197, in forward
+    y = self.norm2(y)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    cnet_list = self.cnet(image1, d_features)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/batchnorm.py", line 763, in forward
+    return sync_batch_norm.apply(
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/autograd/function.py", line 539, in apply
+    return forward_call(*args, **kwargs)
+  File "/home/yijiayi/DEFOM-Stereo-main2/DEFOM-Stereo-main/core/extractor.py", line 362, in forward
+    return super().apply(*args, **kwargs)  # type: ignore[misc]
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/_functions.py", line 108, in forward
+    return torch.batch_norm_elemt(input, weight, bias, mean, invstd, eps)
+    torch.cuda.x = self.layer1(x)OutOfMemoryError
+: CUDA out of memory. Tried to allocate 50.00 MiB. GPU 1 has a total capacty of 23.65 GiB of which 36.50 MiB is free. Process 9057 has 20.26 GiB memory in use. Including non-PyTorch memory, this process has 3.33 GiB memory in use. Of the allocated memory 2.66 GiB is allocated by PyTorch, and 94.90 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+
+    return self._call_impl(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/container.py", line 215, in forward
+    input = module(input)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/yijiayi/DEFOM-Stereo-main2/DEFOM-Stereo-main/core/extractor.py", line 133, in forward
+    y = self.norm2(y)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/batchnorm.py", line 763, in forward
+    return sync_batch_norm.apply(
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/autograd/function.py", line 539, in apply
+    return super().apply(*args, **kwargs)  # type: ignore[misc]
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/nn/modules/_functions.py", line 108, in forward
+    return torch.batch_norm_elemt(input, weight, bias, mean, invstd, eps)
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 50.00 MiB. GPU 0 has a total capacty of 23.65 GiB of which 22.50 MiB is free. Process 8855 has 20.27 GiB memory in use. Including non-PyTorch memory, this process has 3.34 GiB memory in use. Of the allocated memory 2.66 GiB is allocated by PyTorch, and 102.52 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF
+[2026-03-26 20:44:51,590] torch.distributed.elastic.multiprocessing.api: [ERROR] failed (exitcode: 1) local_rank: 0 (pid: 4394) of binary: /home/yijiayi/anaconda3/envs/defomstereo/bin/python
+Traceback (most recent call last):
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/runpy.py", line 197, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/distributed/launch.py", line 196, in <module>
+    main()
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/distributed/launch.py", line 192, in main
+    launch(args)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/distributed/launch.py", line 177, in launch
+    run(args)
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/distributed/run.py", line 797, in run
+    elastic_launch(
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/distributed/launcher/api.py", line 134, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/home/yijiayi/anaconda3/envs/defomstereo/lib/python3.9/site-packages/torch/distributed/launcher/api.py", line 264, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+train_stereo.py FAILED
+------------------------------------------------------------
+Failures:
+[1]:
+  time      : 2026-03-26_20:44:51
+  host      : 4090
+  rank      : 1 (local_rank: 1)
+  exitcode  : 1 (pid: 4395)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-03-26_20:44:51
+  host      : 4090
+  rank      : 0 (local_rank: 0)
+  exitcode  : 1 (pid: 4394)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================
