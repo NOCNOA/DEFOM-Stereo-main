@@ -643,3 +643,291 @@ class CostVolumeDisparityAttention(nn.Module):
     x = x.reshape(B,H,W,D,C).permute(0,4,3,1,2)
 
     return x
+
+
+class simple_attn_3d3_chunked(nn.Module):
+    """
+    Memory-friendlier variant of simple_attn_3d3.
+
+    It keeps the same galerkin formulation, but computes the B*D*H axis in chunks
+    so peak activation memory is lower during training/inference.
+    """
+
+    def __init__(self, midc, heads, chunk_size=1024):
+        super().__init__()
+        assert midc % heads == 0, "midc must be divisible by heads"
+
+        self.headc = midc // heads
+        self.heads = heads
+        self.midc = midc
+        self.chunk_size = int(chunk_size)
+
+        self.qkv_proj = nn.Conv3d(midc, 3 * midc, 1)
+        self.o_proj1 = nn.Conv3d(midc, midc, 1)
+        self.o_proj2 = nn.Conv3d(midc, midc, 1)
+
+        self.kln = nn.LayerNorm(self.headc, elementwise_affine=True)
+        self.vln = nn.LayerNorm(self.headc, elementwise_affine=True)
+
+        self.act = nn.GELU()
+
+    def forward(self, x, name='0'):
+        B, C, D, H, W = x.shape
+        bias = x
+
+        qkv = self.qkv_proj(x)
+        qkv = qkv.view(B, 3, self.heads, self.headc, D, H, W)
+        qkv = qkv.permute(0, 4, 5, 6, 2, 1, 3).contiguous()
+        qkv = qkv.view(B * D * H, W, self.heads, 3 * self.headc)
+        qkv = qkv.permute(0, 2, 1, 3).contiguous()
+
+        total = qkv.shape[0]
+        chunk = total if self.chunk_size <= 0 else self.chunk_size
+        y_chunks = []
+
+        for start in range(0, total, chunk):
+            qkv_i = qkv[start:start + chunk]
+            q, k, v = qkv_i.chunk(3, dim=-1)
+
+            k = self.kln(k)
+            v = self.vln(v)
+
+            a = torch.matmul(k.transpose(-2, -1), v / float(W))
+            y = torch.matmul(q, a)
+            y_chunks.append(y)
+
+        y = torch.cat(y_chunks, dim=0)
+        y = y.permute(0, 2, 1, 3).contiguous().view(B, D, H, W, C)
+
+        ret = y.permute(0, 4, 1, 2, 3) + bias
+        out = self.o_proj2(self.act(self.o_proj1(ret))) + bias
+        return out
+
+
+class simple_attn_3d_hw_patch_rearrange(nn.Module):
+    """
+    Patch Galerkin attention with a low-overhead non-overlapping path.
+
+    When stride == patch, it uses view/permute-based patch rearrangement instead of
+    unfold/fold, which avoids the large patch buffer copies. For overlapping patches,
+    it falls back to unfold/fold and normalizes the fold result by overlap counts.
+    """
+
+    def __init__(self, midc: int, heads: int, patch: int = 4, stride: int = None, pad_mode: str = "replicate", chunk_patches: int = 0):
+        super().__init__()
+        assert midc % heads == 0, "midc must be divisible by heads"
+
+        self.midc = midc
+        self.heads = heads
+        self.headc = midc // heads
+        self.patch = int(patch)
+        self.stride = int(stride) if stride is not None else int(patch)
+        self.pad_mode = pad_mode
+        self.chunk_patches = int(chunk_patches)
+
+        self.qkv_proj = nn.Conv3d(midc, 3 * midc, kernel_size=1, bias=True)
+        self.o_proj1 = nn.Conv3d(midc, midc, kernel_size=1, bias=True)
+        self.o_proj2 = nn.Conv3d(midc, midc, kernel_size=1, bias=True)
+
+        self.kln = nn.LayerNorm(self.headc, elementwise_affine=True)
+        self.vln = nn.LayerNorm(self.headc, elementwise_affine=True)
+
+        self.act = nn.GELU()
+
+    def _pad_hw(self, x: torch.Tensor):
+        B, C, D, H, W = x.shape
+        s = self.stride
+        n = self.patch
+
+        if s == n:
+            pad_h = (n - (H % n)) % n
+            pad_w = (n - (W % n)) % n
+        else:
+            pad_h = (s - (H % s)) % s
+            pad_w = (s - (W % s)) % s
+            if H + pad_h < n:
+                pad_h += n - (H + pad_h)
+            if W + pad_w < n:
+                pad_w += n - (W + pad_w)
+
+        if pad_h == 0 and pad_w == 0:
+            return x, (0, 0, H, W)
+
+        x_pad = F.pad(x, (0, pad_w, 0, pad_h, 0, 0), mode=self.pad_mode)
+        return x_pad, (pad_h, pad_w, H, W)
+
+    def _galerkin_tokens(self, patches: torch.Tensor):
+        num_patch, L, _ = patches.shape
+        patches = patches.view(num_patch, L, self.heads, 3 * self.headc)
+        patches = patches.permute(0, 2, 1, 3).contiguous()
+
+        if self.chunk_patches > 0:
+            outputs = []
+            for start in range(0, num_patch, self.chunk_patches):
+                part = patches[start:start + self.chunk_patches]
+                q, k, v = part.chunk(3, dim=-1)
+                k = self.kln(k)
+                v = self.vln(v)
+                a = torch.matmul(k.transpose(-2, -1), v / float(L))
+                outputs.append(torch.matmul(q, a))
+            y = torch.cat(outputs, dim=0)
+        else:
+            q, k, v = patches.chunk(3, dim=-1)
+            k = self.kln(k)
+            v = self.vln(v)
+            a = torch.matmul(k.transpose(-2, -1), v / float(L))
+            y = torch.matmul(q, a)
+
+        y = y.permute(0, 2, 1, 3).contiguous().view(num_patch, L, self.midc)
+        return y
+
+    def _forward_non_overlapping(self, qkv2d: torch.Tensor, Hp: int, Wp: int):
+        BD, threeC, _, _ = qkv2d.shape
+        n = self.patch
+        nh = Hp // n
+        nw = Wp // n
+        L = n * n
+
+        patches = qkv2d.view(BD, threeC, nh, n, nw, n)
+        patches = patches.permute(0, 2, 4, 3, 5, 1).contiguous()
+        patches = patches.view(BD * nh * nw, L, threeC)
+
+        y = self._galerkin_tokens(patches)
+
+        y = y.view(BD, nh, nw, n, n, self.midc)
+        y = y.permute(0, 5, 1, 3, 2, 4).contiguous()
+        y2d = y.view(BD, self.midc, Hp, Wp)
+        return y2d
+
+    def _forward_overlapping(self, qkv2d: torch.Tensor, Hp: int, Wp: int):
+        BD, _, _, _ = qkv2d.shape
+        n = self.patch
+        s = self.stride
+        L = n * n
+
+        patches = F.unfold(qkv2d, kernel_size=n, stride=s)
+        _, threeC_L, Np = patches.shape
+        expected = 3 * self.midc * L
+        if threeC_L != expected:
+            raise RuntimeError(f"Unexpected unfold shape: got {threeC_L}, expected {expected}")
+
+        patches = patches.view(BD, 3 * self.midc, L, Np).permute(0, 3, 2, 1).contiguous()
+        patches = patches.view(BD * Np, L, 3 * self.midc)
+        y = self._galerkin_tokens(patches)
+
+        y_fold_in = y.view(BD, Np, L, self.midc).permute(0, 3, 2, 1).contiguous()
+        y_fold_in = y_fold_in.view(BD, self.midc * L, Np)
+        y2d = F.fold(y_fold_in, output_size=(Hp, Wp), kernel_size=n, stride=s)
+
+        ones = qkv2d.new_ones((BD, 1, Hp, Wp))
+        denom = F.fold(F.unfold(ones, kernel_size=n, stride=s), output_size=(Hp, Wp), kernel_size=n, stride=s)
+        y2d = y2d / denom.clamp_min(1.0)
+        return y2d
+
+    def forward(self, x: torch.Tensor, name: str = "0"):
+        if x.ndim != 5:
+            raise ValueError(f"Expected [B,C,D,H,W], got {tuple(x.shape)}")
+
+        B, C, D, H, W = x.shape
+        bias = x
+
+        x_pad, (pad_h, pad_w, H0, W0) = self._pad_hw(x)
+        _, _, _, Hp, Wp = x_pad.shape
+
+        qkv = self.qkv_proj(x_pad)
+        qkv2d = qkv.permute(0, 2, 1, 3, 4).contiguous().view(B * D, 3 * C, Hp, Wp)
+
+        if self.stride == self.patch:
+            y2d = self._forward_non_overlapping(qkv2d, Hp, Wp)
+        else:
+            y2d = self._forward_overlapping(qkv2d, Hp, Wp)
+
+        y3d = y2d.view(B, D, C, Hp, Wp).permute(0, 2, 1, 3, 4).contiguous()
+
+        if pad_h > 0 or pad_w > 0:
+            y3d = y3d[:, :, :, :H0, :W0]
+
+        ret = y3d + bias
+        out = self.o_proj2(self.act(self.o_proj1(ret))) + bias
+        return out
+
+
+class simple_attn_3d3_hchunk(nn.Module):
+    """
+    Galerkin attention over full W and local H chunks.
+
+    For each (b, d, h_block), the sequence length is h_chunk * W, which extends
+    simple_attn_3d3 from single-row attention to short horizontal bands while
+    keeping the implementation free of unfold/fold buffers.
+    """
+
+    def __init__(self, midc, heads, h_chunk=4, group_chunk_size=256):
+        super().__init__()
+        assert midc % heads == 0, "midc must be divisible by heads"
+        assert h_chunk > 0, "h_chunk must be positive"
+
+        self.headc = midc // heads
+        self.heads = heads
+        self.midc = midc
+        self.h_chunk = int(h_chunk)
+        self.group_chunk_size = int(group_chunk_size)
+
+        self.qkv_proj = nn.Conv3d(midc, 3 * midc, 1)
+        self.o_proj1 = nn.Conv3d(midc, midc, 1)
+        self.o_proj2 = nn.Conv3d(midc, midc, 1)
+
+        self.kln = nn.LayerNorm(self.headc, elementwise_affine=True)
+        self.vln = nn.LayerNorm(self.headc, elementwise_affine=True)
+
+        self.act = nn.GELU()
+
+    def _pad_h(self, x: torch.Tensor):
+        B, C, D, H, W = x.shape
+        pad_h = (self.h_chunk - (H % self.h_chunk)) % self.h_chunk
+        if pad_h == 0:
+            return x, (0, H)
+
+        x_pad = F.pad(x, (0, 0, 0, pad_h, 0, 0), mode="replicate")
+        return x_pad, (pad_h, H)
+
+    def forward(self, x, name='0'):
+        B, C, D, H, W = x.shape
+        bias = x
+
+        x_pad, (pad_h, H0) = self._pad_h(x)
+        _, _, _, Hp, _ = x_pad.shape
+        num_h_blocks = Hp // self.h_chunk
+        L = self.h_chunk * W
+
+        qkv = self.qkv_proj(x_pad)
+        qkv = qkv.view(B, 3, self.heads, self.headc, D, Hp, W)
+        qkv = qkv.view(B, 3, self.heads, self.headc, D, num_h_blocks, self.h_chunk, W)
+        qkv = qkv.permute(0, 4, 5, 6, 7, 2, 1, 3).contiguous()
+        qkv = qkv.view(B * D * num_h_blocks, L, self.heads, 3 * self.headc)
+        qkv = qkv.permute(0, 2, 1, 3).contiguous()
+
+        total_groups = qkv.shape[0]
+        chunk = total_groups if self.group_chunk_size <= 0 else self.group_chunk_size
+        y_chunks = []
+
+        for start in range(0, total_groups, chunk):
+            qkv_i = qkv[start:start + chunk]
+            q, k, v = qkv_i.chunk(3, dim=-1)
+
+            k = self.kln(k)
+            v = self.vln(v)
+
+            a = torch.matmul(k.transpose(-2, -1), v / float(L))
+            y = torch.matmul(q, a)
+            y_chunks.append(y)
+
+        y = torch.cat(y_chunks, dim=0)
+        y = y.permute(0, 2, 1, 3).contiguous()
+        y = y.view(B, D, num_h_blocks, self.h_chunk, W, C)
+        y = y.view(B, D, Hp, W, C)
+        y = y[:, :, :H0]
+        y = y.permute(0, 4, 1, 2, 3).contiguous()
+
+        ret = y + bias
+        out = self.o_proj2(self.act(self.o_proj1(ret))) + bias
+        return out

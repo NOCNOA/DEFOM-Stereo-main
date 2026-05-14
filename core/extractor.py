@@ -1,11 +1,14 @@
+import importlib
 import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from timm.models.layers import DropPath
 import timm
-from depth_anything_v2.dpt import DepthAnythingV2
+from depth_anything_v2.dpt import DepthAnythingV2, _make_fusion_block
+from depth_anything_v2.util.blocks import _make_scratch
 from core.submodules import BasicConv, Conv2x_IN
+
 class Feature(nn.Module):
     def __init__(self, args, out_dim):
         super(Feature, self).__init__()
@@ -382,6 +385,159 @@ class MultiBasicEncoder(nn.Module):
         return (outputs08, outputs16, outputs32)
 
 
+class SpatialDPTFeat(nn.Module):
+    def __init__(self, in_channels, features=256, use_bn=False, out_channels=[256, 512, 1024, 1024]):
+        super(SpatialDPTFeat, self).__init__()
+
+        self.projects = nn.ModuleList([
+            nn.Conv2d(in_channels=in_channels, out_channels=out_channel, kernel_size=1, stride=1, padding=0)
+            for out_channel in out_channels
+        ])
+        self.resize_layers = nn.ModuleList([
+            nn.ConvTranspose2d(out_channels[0], out_channels[0], kernel_size=4, stride=4, padding=0),
+            nn.ConvTranspose2d(out_channels[1], out_channels[1], kernel_size=2, stride=2, padding=0),
+            nn.Identity(),
+            nn.Conv2d(out_channels[3], out_channels[3], kernel_size=3, stride=2, padding=1),
+        ])
+
+        self.scratch = _make_scratch(out_channels, features, groups=1, expand=False)
+        self.scratch.stem_transpose = None
+        self.scratch.refinenet1 = _make_fusion_block(features, use_bn)
+        self.scratch.refinenet2 = _make_fusion_block(features, use_bn)
+        self.scratch.refinenet3 = _make_fusion_block(features, use_bn)
+        self.scratch.refinenet4 = _make_fusion_block(features, use_bn)
+
+    def forward(self, spatial_features, out_h, out_w):
+        bs = spatial_features[0].shape[0]
+        out = []
+        for i, x in enumerate(spatial_features):
+            x = x.permute(0, 3, 1, 2).contiguous()
+            x = self.projects[i](x)
+            x = self.resize_layers[i](x)
+            out.append(x)
+
+        layer_1, layer_2, layer_3, layer_4 = out
+        layer_1_rn = self.scratch.layer1_rn(layer_1)
+        layer_2_rn = self.scratch.layer2_rn(layer_2)
+        layer_3_rn = self.scratch.layer3_rn(layer_3)
+        layer_4_rn = self.scratch.layer4_rn(layer_4)
+
+        layer_1_rn = F.interpolate(layer_1_rn, (out_h, out_w), mode="bilinear", align_corners=True)
+        layer_2_rn = F.interpolate(layer_2_rn, (out_h // 2, out_w // 2), mode="bilinear", align_corners=True)
+        layer_3_rn = F.interpolate(layer_3_rn, (out_h // 4, out_w // 4), mode="bilinear", align_corners=True)
+        layer_4_rn = F.interpolate(layer_4_rn, (out_h // 8, out_w // 8), mode="bilinear", align_corners=True)
+
+        out_features = [layer_1_rn[:bs // 2], layer_2_rn[:bs // 2], layer_3_rn[:bs // 2]]
+
+        path_4 = self.scratch.refinenet4(layer_4_rn, size=layer_3_rn.shape[2:])
+        path_3 = self.scratch.refinenet3(path_4, layer_3_rn, size=layer_2_rn.shape[2:])
+        path_2 = self.scratch.refinenet2(path_3, layer_2_rn, size=layer_1_rn.shape[2:])
+        path_1 = self.scratch.refinenet1(path_2, layer_1_rn)
+
+        return out_features, path_1[:bs // 2], path_1[bs // 2:]
+
+
+class DepthAnythingV3(nn.Module):
+    MODEL_CONFIGS = {
+        'da3s': {
+            'model_name': 'da3-small',
+            'features': 64,
+            'out_channels': [48, 96, 192, 384],
+            'out_layers': [5, 7, 9, 11],
+            'dim_in': 384,
+        },
+        'da3b': {
+            'model_name': 'da3-base',
+            'features': 128,
+            'out_channels': [96, 192, 384, 768],
+            'out_layers': [5, 7, 9, 11],
+            'dim_in': 768,
+        },
+        'da3l': {
+            'model_name': 'da3-large',
+            'features': 256,
+            'out_channels': [256, 512, 1024, 1024],
+            'out_layers': [11, 15, 19, 23],
+            'dim_in': 1024,
+        },
+    }
+
+    def __init__(self, model_key, pretrained=True, freeze=True):
+        super(DepthAnythingV3, self).__init__()
+
+        if model_key not in self.MODEL_CONFIGS:
+            raise ValueError(f"Unsupported Depth Anything 3 model: {model_key}")
+
+        self.model_cfg = self.MODEL_CONFIGS[model_key]
+        self.depth_feat = SpatialDPTFeat(
+            self.model_cfg['dim_in'],
+            self.model_cfg['features'],
+            out_channels=self.model_cfg['out_channels'],
+        )
+        self.depth_anything = self._build_model(pretrained)
+
+        if freeze:
+            for param in self.depth_anything.model.parameters():
+                param.requires_grad = False
+
+        self.out_dim = self.model_cfg['features']
+
+    def _build_model(self, pretrained):
+        try:
+            da3_api = importlib.import_module('depth_anything_3.api')
+        except ImportError as exc:
+            raise ImportError(
+                "Depth Anything 3 support requires the `depth_anything_3` package. "
+                "Install the official repository and provide a local model directory."
+            ) from exc
+
+        if not pretrained:
+            return da3_api.DepthAnything3(model_name=self.model_cfg['model_name'])
+
+        model_source = self._resolve_model_source()
+        if model_source is None:
+            raise FileNotFoundError(
+                "Depth Anything 3 was requested but no local model directory was found. "
+                "Set `DEPTH_ANYTHING_3_MODEL_DIR` or place the model under "
+                f"`checkpoints/{self.model_cfg['model_name']}`."
+            )
+
+        return da3_api.DepthAnything3.from_pretrained(model_source)
+
+    def _resolve_model_source(self):
+        env_key = f"DEPTH_ANYTHING_3_{self.model_cfg['model_name'].upper().replace('-', '_')}_DIR"
+        candidates = [
+            os.environ.get(env_key),
+            os.environ.get('DEPTH_ANYTHING_3_MODEL_DIR'),
+            os.path.join('checkpoints', self.model_cfg['model_name']),
+            os.path.join('checkpoints', self.model_cfg['model_name'].replace('-', '_')),
+        ]
+
+        for candidate in candidates:
+            if candidate and os.path.exists(candidate):
+                return candidate
+        return None
+
+    def forward(self, x, out_h, out_w):
+        if x.shape[0] % 2 != 0:
+            raise ValueError("Depth Anything 3 expects paired stereo inputs.")
+
+        bs = x.shape[0] // 2
+        stereo_pairs = torch.stack((x[:bs], x[bs:]), dim=1)
+        output = self.depth_anything(stereo_pairs, export_feat_layers=self.model_cfg['out_layers'])
+
+        spatial_features = []
+        for layer_idx in self.model_cfg['out_layers']:
+            layer_feat = output['aux'][f'feat_layer_{layer_idx}']
+            spatial_features.append(layer_feat.reshape(bs * 2, layer_feat.shape[2], layer_feat.shape[3], layer_feat.shape[4]))
+
+        d_features, left_feat, right_feat = self.depth_feat(spatial_features, out_h, out_w)
+        depth = output['depth'][:, 0].unsqueeze(1)
+        idepth = torch.reciprocal(depth.clamp_min(1e-6))
+
+        return d_features, left_feat, right_feat, idepth
+
+
 class DefomEncoder(nn.Module):
     def __init__(self, dinov2_encoder, pretrained=True, freeze=True, idepth_scale=0.25):
         super(DefomEncoder, self).__init__()
@@ -394,19 +550,25 @@ class DefomEncoder(nn.Module):
             'vits': {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]},
             'vitb': {'encoder': 'vitb', 'features': 128, 'out_channels': [96, 192, 384, 768]},
             'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]},
-            'vitg': {'encoder': 'vitg', 'features': 384, 'out_channels': [1536, 1536, 1536, 1536]}
+            'vitg': {'encoder': 'vitg', 'features': 384, 'out_channels': [1536, 1536, 1536, 1536]},
+            'da3s': {'features': 64},
+            'da3b': {'features': 128},
+            'da3l': {'features': 256},
         }
 
-        self.depth_anything = DepthAnythingV2(**model_configs[self.dinov2_encoder])
+        if self.dinov2_encoder.startswith('da3'):
+            self.depth_anything = DepthAnythingV3(self.dinov2_encoder, pretrained=pretrained, freeze=freeze)
+        else:
+            self.depth_anything = DepthAnythingV2(**model_configs[self.dinov2_encoder])
 
-        if pretrained and os.path.exists(f'./checkpoints/depth_anything_v2_{dinov2_encoder}.pth'):
-            self.depth_anything.load_state_dict(
-                torch.load(f'./checkpoints/depth_anything_v2_{dinov2_encoder}.pth', map_location='cpu'), strict=False)
-        if freeze:
-            for param in self.depth_anything.pretrained.parameters():
-                param.requires_grad = False
-            for param in self.depth_anything.depth_head.parameters():
-                param.requires_grad = False
+            if pretrained and os.path.exists(f'./checkpoints/depth_anything_v2_{dinov2_encoder}.pth'):
+                self.depth_anything.load_state_dict(
+                    torch.load(f'./checkpoints/depth_anything_v2_{dinov2_encoder}.pth', map_location='cpu'), strict=False)
+            if freeze:
+                for param in self.depth_anything.pretrained.parameters():
+                    param.requires_grad = False
+                for param in self.depth_anything.depth_head.parameters():
+                    param.requires_grad = False
         
         self.out_dim = model_configs[self.dinov2_encoder]['features']
 
