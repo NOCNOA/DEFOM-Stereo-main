@@ -258,7 +258,7 @@ if __name__ == '__main__':
     parser.add_argument('--valid_iters', type=int, default=32, help='number of disparity field updates during validation forward pass')
 
     # Raft Architecure choices
-    parser.add_argument('--dinov2_encoder', type=str, default='vits', choices=['vits', 'vitb', 'vitl', 'vitg'])
+    parser.add_argument('--dinov2_encoder', type=str, default='vits', choices=['vits', 'vitb', 'vitl', 'vitg', 'da3s', 'da3b', 'da3l'])
     parser.add_argument('--idepth_scale', type=float, default=0.5, help="the scale of inverse depth to initialize disparity")
     parser.add_argument('--corr_implementation', choices=["reg", "alt", "reg_cuda", "alt_cuda"], default="reg", help="correlation volume implementation")
     parser.add_argument('--corr_levels', type=int, default=2, help="number of levels in the correlation pyramid")

@@ -472,7 +472,7 @@ if __name__ == '__main__':
     parser.add_argument('--scale_iters', type=int, default=20, help="number of scaling updates to the disparity field in each forward pass.")
 
     # Architecure choices
-    parser.add_argument('--dinov2_encoder', type=str, default='vits', choices=['vits', 'vitb', 'vitl', 'vitg'])
+    parser.add_argument('--dinov2_encoder', type=str, default='vits', choices=['vits', 'vitb', 'vitl', 'vitg', 'da3s', 'da3b', 'da3l'])
     parser.add_argument('--idepth_scale', type=float, default=0.5, help="the scale of inverse depth to initialize disparity")
     parser.add_argument('--hidden_dims', nargs='+', type=int, default=[128]*3, help="hidden state and context dimensions")
     parser.add_argument('--corr_implementation', choices=["reg", "alt", "reg_cuda", "alt_cuda"], default="reg", help="correlation volume implementation")
@@ -533,4 +533,3 @@ if __name__ == '__main__':
                 validate_middlebury_indetail(model, iters=args.valid_iters, scale_iters=args.scale_iters, split=s, mixed_prec=use_mixed_precision)
             else:
                 validate_middlebury(model, iters=args.valid_iters, scale_iters=args.scale_iters, split=s, mixed_prec=use_mixed_precision)
-

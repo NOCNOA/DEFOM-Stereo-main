@@ -179,7 +179,7 @@ if __name__ == '__main__':
     parser.add_argument('--method_name', default="DEFOM-Stereo", help="the method to test")
 
     # Architecure choices
-    parser.add_argument('--dinov2_encoder', type=str, default='vits', choices=['vits', 'vitb', 'vitl', 'vitg'])
+    parser.add_argument('--dinov2_encoder', type=str, default='vits', choices=['vits', 'vitb', 'vitl', 'vitg', 'da3s', 'da3b', 'da3l'])
     parser.add_argument('--idepth_scale', type=float, default=0.5,
                         help="the scale of inverse depth to initialize disparity")
     parser.add_argument('--hidden_dims', nargs='+', type=int, default=[128] * 3,
@@ -246,4 +246,3 @@ if __name__ == '__main__':
             makedirs(save_path)
             test_middlebury(model, save_path, iters=args.valid_iters, scale_iters=args.scale_iters, split=s,
                             method_name=args.method_name, mixed_prec=use_mixed_precision)
-
