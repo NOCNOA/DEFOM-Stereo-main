@@ -533,6 +533,7 @@ class DepthAnythingV3(nn.Module):
 
         d_features, left_feat, right_feat = self.depth_feat(spatial_features, out_h, out_w)
         depth = output['depth'][:, 0].unsqueeze(1)
+        depth = F.interpolate(depth, (out_h, out_w), mode='bilinear', align_corners=True)
         idepth = torch.reciprocal(depth.clamp_min(1e-6))
 
         return d_features, left_feat, right_feat, idepth
